@@ -1,0 +1,6 @@
+@IncidenciasTI.API_HostAddress = http://localhost:5268
+
+GET {{IncidenciasTI.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
