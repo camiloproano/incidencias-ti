@@ -31,3 +31,4 @@ C:\Users\CAMILO\Downloads\ProyectoFinalBDD\incidencias-ti\backend\IncidenciasTI.
 C:\Users\CAMILO\Downloads\ProyectoFinalBDD\incidencias-ti\backend\IncidenciasTI.API\obj\Debug\net8.0\IncidenciasTI.API.pdb
 C:\Users\CAMILO\Downloads\ProyectoFinalBDD\incidencias-ti\backend\IncidenciasTI.API\obj\Debug\net8.0\IncidenciasTI.API.genruntimeconfig.cache
 C:\Users\CAMILO\Downloads\ProyectoFinalBDD\incidencias-ti\backend\IncidenciasTI.API\obj\Debug\net8.0\ref\IncidenciasTI.API.dll
+C:\Users\CAMILO\Downloads\ProyectoFinalBDD\incidencias-ti\backend\IncidenciasTI.API\obj\Debug\net8.0\IncidenciasTI.API.sourcelink.json

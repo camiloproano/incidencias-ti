@@ -1,19 +1,53 @@
 import { useEffect, useState } from "react";
-import { obtenerIncidencias } from "../api/incidenciasApi";
+import { obtenerIncidencias, crearIncidencia, eliminarIncidencia } from "../api/incidenciasApi";
 
 export default function Incidencias() {
-  const [mensaje, setMensaje] = useState("");
+  const [incidencias, setIncidencias] = useState([]);
+  const [titulo, setTitulo] = useState("");
+
+  const cargarIncidencias = () => {
+    obtenerIncidencias().then(res => setIncidencias(res.data));
+  };
 
   useEffect(() => {
-    obtenerIncidencias()
-      .then(res => setMensaje(res.data))
-      .catch(() => setMensaje("Error al conectar con el backend"));
+    cargarIncidencias();
   }, []);
 
+  const agregarIncidencia = () => {
+    crearIncidencia({
+      titulo,
+      descripcion: "Incidencia creada desde React",
+      prioridad: "Media",
+      estado: "Abierta"
+    }).then(() => {
+      setTitulo("");
+      cargarIncidencias();
+    });
+  };
+
+  const borrarIncidencia = (id) => {
+    eliminarIncidencia(id).then(cargarIncidencias);
+  };
+
   return (
-    <div>
+    <div style={{ padding: "20px" }}>
       <h1>Incidencias TI</h1>
-      <p>{mensaje}</p>
+
+      <input
+        placeholder="Título de la incidencia"
+        value={titulo}
+        onChange={e => setTitulo(e.target.value)}
+      />
+      <button onClick={agregarIncidencia}>Agregar</button>
+
+      <ul>
+        {incidencias.map(i => (
+          <li key={i.id}>
+            <strong>{i.titulo}</strong> ({i.prioridad})
+            <button onClick={() => borrarIncidencia(i.id)}>Eliminar</button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
