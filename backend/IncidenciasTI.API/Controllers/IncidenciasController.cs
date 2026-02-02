@@ -1,81 +1,247 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using IncidenciasTI.API.Data;
 using IncidenciasTI.API.Models;
-
+using Incidencia = IncidenciasTI.API.Models.IncidenciaSql;
+using IncidenciasTI.API.DTOs;
+using IncidenciasTI.Services;
+using IncidenciasTI.Models;
 namespace IncidenciasTI.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     public class IncidenciasController : ControllerBase
     {
-        // Simula base de datos (temporal)
-        private static List<Incidencia> incidencias = new()
-        {
-            new Incidencia { Id = 1, Titulo = "Error de red", Descripcion = "No hay conexión", Prioridad = "Alta" },
-            new Incidencia { Id = 2, Titulo = "PC lenta", Descripcion = "Equipo tarda en iniciar", Prioridad = "Media" }
-        };
+        private readonly AppDbContext _context;
+        private readonly LogService _logService;
+        private readonly SyncService _syncService;
 
+        
+        public IncidenciasController(AppDbContext context, LogService logService, SyncService syncService)
+        {
+            _context = context;
+            _logService = logService;
+            _syncService = syncService;
+        }
         // GET: api/incidencias
         [HttpGet]
-        public IActionResult GetAll()
+        public async Task<IActionResult> GetAll()
         {
-            return Ok(incidencias);
+            try
+            {
+                await _logService.CrearLogAsync(new IncidenciaLog
+                {
+                    Acción = "Consulta masiva",
+                    Usuario = "Desconocido",
+                    Fecha = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error guardando log en MongoDB: {ex.Message}");
+            }
+            var incidencias = await _context.Incidencias.ToListAsync();
+            var incidenciasDto = incidencias.Select(i => new IncidenciaDto
+            {
+                Id = i.Id.ToString(),
+                Titulo = i.Titulo,
+                Descripcion = i.Descripcion,
+                Estado = i.Estado,
+                Prioridad = i.Prioridad,
+                FechaCreacion = i.FechaCreacion,
+                UltimaActualizacion = i.UltimaActualizacion
+            }).ToList();
+            return Ok(incidenciasDto);
         }
 
         // GET: api/incidencias/5
         [HttpGet("{id}")]
-        public IActionResult GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var incidencia = incidencias.FirstOrDefault(i => i.Id == id);
+            var incidencia = await _context.Incidencias.FindAsync(id);
             if (incidencia == null)
                 return NotFound("Incidencia no encontrada");
 
-            return Ok(incidencia);
+            try
+            {
+                await _logService.CrearLogAsync(new IncidenciaLog
+                {
+                    IncidenciaId = incidencia.Id,
+                    Acción = "Consulta por ID",
+                    Usuario = "Desconocido",
+                    Fecha = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error guardando log en MongoDB: {ex.Message}");
+            }
+            var incidenciaDto = new IncidenciaDto
+            {
+                Id = incidencia.Id.ToString(),
+                Titulo = incidencia.Titulo,
+                Descripcion = incidencia.Descripcion,
+                Estado = incidencia.Estado,
+                Prioridad = incidencia.Prioridad,
+                FechaCreacion = incidencia.FechaCreacion,
+                UltimaActualizacion = incidencia.UltimaActualizacion
+            };
+
+            return Ok(incidenciaDto);
         }
 
         // POST: api/incidencias
         [HttpPost]
-        public IActionResult Create([FromBody] Incidencia nuevaIncidencia)
+        public async Task<IActionResult> Create([FromBody] CreateIncidenciaDto createDto)
         {
-            if (nuevaIncidencia == null)
+            if (createDto == null)
                 return BadRequest();
 
-            nuevaIncidencia.Id = incidencias.Any()
-                ? incidencias.Max(i => i.Id) + 1
-                : 1;
+            var nuevaIncidencia = new Incidencia
+            {
+                Titulo = createDto.Titulo,
+                Descripcion = createDto.Descripcion,
+                Prioridad = createDto.Prioridad,
+                FechaCreacion = DateTime.UtcNow,
+                UltimaActualizacion = DateTime.UtcNow,
+                Estado = "Abierta" // Estado por defecto
+            };
 
-            nuevaIncidencia.FechaCreacion = DateTime.Now;
+            await _context.Incidencias.AddAsync(nuevaIncidencia);
+            await _context.SaveChangesAsync();
+            try
+            {
+                Console.WriteLine($"[DEBUG] Intentando crear log para incidencia ID={nuevaIncidencia.Id}");
+                await _logService.CrearLogAsync(new IncidenciaLog
+                {
+                    IncidenciaId = nuevaIncidencia.Id,
+                    Acción = "Creación",
+                    Usuario = createDto.Usuario ?? "Desconocido",
+                    Fecha = DateTime.UtcNow,
+                    Datos = new IncidenciaData
+                    {
+                        Titulo = nuevaIncidencia.Titulo,
+                        Descripcion = nuevaIncidencia.Descripcion,
+                        Estado = nuevaIncidencia.Estado,
+                        Prioridad = nuevaIncidencia.Prioridad,
+                        FechaCreacion = nuevaIncidencia.FechaCreacion,
+                        UltimaActualizacion = nuevaIncidencia.UltimaActualizacion
+                    }
+                });
+                Console.WriteLine($"[DEBUG] Log creado exitosamente para incidencia ID={nuevaIncidencia.Id}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Error guardando log en MongoDB para incidencia ID={nuevaIncidencia.Id}: {ex.Message}");
+                Console.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
+            }
+                        
+            var incidenciaDto = new IncidenciaDto
+            {
+                Id = nuevaIncidencia.Id.ToString(),
+                Titulo = nuevaIncidencia.Titulo,
+                Descripcion = nuevaIncidencia.Descripcion,
+                Estado = nuevaIncidencia.Estado,
+                Prioridad = nuevaIncidencia.Prioridad,
+                FechaCreacion = nuevaIncidencia.FechaCreacion,
+                UltimaActualizacion = nuevaIncidencia.UltimaActualizacion
+            };
 
-            incidencias.Add(nuevaIncidencia);
-            return Ok(nuevaIncidencia);
+            return CreatedAtAction(nameof(GetById), new { id = nuevaIncidencia.Id }, incidenciaDto);
         }
 
-
-        // PUT: api/incidencias/5
         [HttpPut("{id}")]
-        public IActionResult Update(int id, Incidencia incidenciaActualizada)
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateIncidenciaDto updateDto)
         {
-            var incidencia = incidencias.FirstOrDefault(i => i.Id == id);
+            var incidencia = await _context.Incidencias.FindAsync(id);
             if (incidencia == null)
                 return NotFound("Incidencia no encontrada");
 
-            incidencia.Titulo = incidenciaActualizada.Titulo;
-            incidencia.Descripcion = incidenciaActualizada.Descripcion;
-            incidencia.Estado = incidenciaActualizada.Estado;
-            incidencia.Prioridad = incidenciaActualizada.Prioridad;
+            incidencia.Titulo = updateDto.Titulo;
+            incidencia.Descripcion = updateDto.Descripcion;
+            incidencia.Prioridad = updateDto.Prioridad;
+            incidencia.UltimaActualizacion = DateTime.UtcNow;
 
-            return Ok(incidencia);
+            if (!string.IsNullOrEmpty(updateDto.Estado))
+                incidencia.Estado = updateDto.Estado; // solo si se envía
+
+            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _logService.CrearLogAsync(new IncidenciaLog
+                {
+                    IncidenciaId = incidencia.Id,
+                    Acción = "Actualización",
+                    Usuario = updateDto.Usuario ?? "Desconocido",
+                    Fecha = DateTime.UtcNow,
+                    Datos = new IncidenciaData
+                    {
+                        Titulo = incidencia.Titulo,
+                        Descripcion = incidencia.Descripcion,
+                        Estado = incidencia.Estado,
+                        Prioridad = incidencia.Prioridad,
+                        FechaCreacion = incidencia.FechaCreacion,
+                        UltimaActualizacion = incidencia.UltimaActualizacion
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error guardando log en MongoDB: {ex.Message}");
+            }
+
+            return NoContent();
         }
-
         // DELETE: api/incidencias/5
         [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var incidencia = incidencias.FirstOrDefault(i => i.Id == id);
+            var incidencia = await _context.Incidencias.FindAsync(id);
             if (incidencia == null)
                 return NotFound("Incidencia no encontrada");
 
-            incidencias.Remove(incidencia);
-            return Ok("Incidencia eliminada correctamente");
+            _context.Incidencias.Remove(incidencia);
+            await _context.SaveChangesAsync();
+            try
+            {
+                await _logService.CrearLogAsync(new IncidenciaLog
+                {
+                    IncidenciaId = incidencia.Id,
+                    Acción = "Eliminación",
+                    Usuario = "Sistema",
+                    Fecha = DateTime.UtcNow,
+                    Datos = new IncidenciaData
+                    {
+                        Titulo = incidencia.Titulo,
+                        Descripcion = incidencia.Descripcion,
+                        Estado = incidencia.Estado,
+                        Prioridad = incidencia.Prioridad,
+                        FechaCreacion = incidencia.FechaCreacion,
+                        UltimaActualizacion = incidencia.UltimaActualizacion
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error guardando log en MongoDB: {ex.Message}");
+            }
+            return NoContent();
+        }
+
+        // POST: api/incidencias/sync
+        [HttpPost("sync")]
+        public async Task<IActionResult> Sync()
+        {
+            try
+            {
+                await _syncService.SincronizarAsync();
+                return Ok("Sincronización completada exitosamente");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error durante la sincronización: {ex.Message}");
+            }
         }
     }
 }

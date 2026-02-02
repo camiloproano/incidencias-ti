@@ -1,16 +1,199 @@
-# React + Vite
+## Lo que debe tener:
+SISTEMA DE INTEGRACIÓN Y TRANSFORMACIÓN DE DATOS
+POSTGRESQL ↔ MONGODB
+CASO DE USO: INCIDENCIAS TI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+DESCRIPCIÓN GENERAL
+Este proyecto implementa una aplicación distribuida para la gestión de incidencias de Tecnologías de la Información (TI), utilizando una arquitectura híbrida que combina una base de datos relacional (PostgreSQL) y una base de datos documental (MongoDB).
 
-Currently, two official plugins are available:
+El sistema permite realizar operaciones CRUD en ambos motores, transformar datos entre estructuras relacionales y documentales, y sincronizar la información de manera controlada y verificable.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+ARQUITECTURA DEL SISTEMA
 
-## React Compiler
+Frontend (React)
+→ se comunica mediante HTTP (API REST)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Backend (ASP.NET Core Web API)
+→ PostgreSQL: almacena los datos estructurados principales
+→ MongoDB: almacena datos documentales (historial, logs, transformaciones)
 
-## Expanding the ESLint configuration
+La aplicación demuestra el flujo de datos entre ambos motores de base de datos.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+TECNOLOGÍAS UTILIZADAS
+
+Backend
+
+ASP.NET Core Web API
+
+Entity Framework Core
+
+PostgreSQL
+
+MongoDB.Driver
+
+Swagger (OpenAPI)
+
+Frontend
+
+React
+
+Vite
+
+Fetch o Axios
+
+Herramientas
+
+Visual Studio Code
+
+pgAdmin
+
+MongoDB Compass
+
+ESTRUCTURA GENERAL DEL BACKEND
+
+Controllers
+
+Controladores REST (IncidenciasController)
+
+Models
+
+Entidades del dominio (Incidencia, IncidenciaLog)
+
+DTOs
+
+Objetos de transferencia de datos (CreateIncidenciaDto, IncidenciaDto)
+
+Data
+
+AppDbContext (PostgreSQL)
+
+MongoDbService (MongoDB)
+
+Helpers
+
+Utilidades y lógica auxiliar (si aplica)
+
+MODELO DE DATOS
+
+PostgreSQL (modelo relacional)
+Tabla: Incidencias
+Campos principales:
+
+Id
+
+Titulo
+
+Descripcion
+
+Estado
+
+Prioridad
+
+FechaCreacion
+
+MongoDB (modelo documental)
+Colección: IncidenciasLogs
+Campos principales:
+
+Id (ObjectId)
+
+IncidenciaId
+
+Accion (CREADA, ACTUALIZADA, ELIMINADA)
+
+Fecha
+
+Datos (estructura JSON flexible)
+
+TRANSFORMACIÓN DE DATOS
+
+Relacional → Documental
+Cada operación realizada sobre una incidencia en PostgreSQL genera un documento en MongoDB que registra la acción realizada y los datos involucrados.
+
+Documental → Relacional
+La información documental puede utilizarse para análisis histórico, auditoría o reconstrucción del estado (opcional).
+
+Las reglas de transformación están definidas explícitamente en el backend.
+
+SINCRONIZACIÓN
+
+La sincronización es automática y ocurre cuando:
+
+Se crea una incidencia
+
+Se actualiza una incidencia
+
+Se elimina una incidencia
+
+Cada sincronización registra:
+
+Fecha y hora
+
+Tipo de acción
+
+Datos relacionados
+
+Manejo básico de conflictos:
+
+Se considera válida la última operación registrada.
+
+ENDPOINTS PRINCIPALES
+
+GET /api/incidencias
+Lista todas las incidencias
+
+GET /api/incidencias/{id}
+Obtiene una incidencia específica
+
+POST /api/incidencias
+Crea una nueva incidencia
+
+PUT /api/incidencias/{id}
+Actualiza una incidencia existente
+
+DELETE /api/incidencias/{id}
+Elimina una incidencia
+
+EJECUCIÓN DEL PROYECTO
+
+Backend
+
+Ejecutar: dotnet run
+
+Acceder a Swagger para pruebas de la API
+
+Frontend
+
+Ejecutar: npm install
+
+Ejecutar: npm run dev
+
+EVIDENCIAS DE EJECUCIÓN
+
+Capturas de Swagger mostrando CRUD funcional
+
+Capturas de pgAdmin con registros en PostgreSQL
+
+Capturas de MongoDB Compass con documentos creados
+
+Logs de sincronización entre motores
+
+CRITERIOS DE PROYECTO COMPLETADO
+
+CRUD completo en PostgreSQL
+
+CRUD accesible vía API REST
+
+Uso simultáneo de PostgreSQL y MongoDB
+
+Transformación de datos relacional ↔ documental
+
+Sincronización entre ambos motores
+
+Aplicación funcional con caso de uso claro
+
+Evidencias visuales de ejecución
+
+CONCLUSIONES
+
+El proyecto demuestra el uso práctico de arquitecturas híbridas modernas, integrando bases de datos relacionales y documentales para resolver un problema realista de gestión de incidencias TI.
