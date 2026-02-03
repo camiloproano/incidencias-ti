@@ -1,0 +1,91 @@
+/* Filter Bar Styles */
+.filter-bar {
+  background: white;
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.count-badge {
+  background: var(--primary);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-group label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--dark);
+}
+
+.filter-group select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: white;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.btn-reset {
+  padding: 0.5rem 1rem;
+  background: var(--secondary);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-reset:hover {
+  background: #5a6268;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-controls {
+    flex-direction: column;
+  }
+
+  .filter-group select {
+    min-width: 100%;
+  }
+
+  .btn-reset {
+    width: 100%;
+  }
+}

@@ -1,0 +1,52 @@
+[
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439011"},
+    "guidId": "550e8400-e29b-41d4-a716-446655440001",
+    "titulo": "Servidor SQL caído",
+    "descripcion": "El servidor principal de base de datos no responde desde las 10:30. Se debe reiniciar o restaurar desde backup.",
+    "estado": "Abierta",
+    "prioridad": "Crítica",
+    "fechaCreacion": {"$date": "2026-02-01T10:30:00Z"},
+    "ultimaActualizacion": {"$date": "2026-02-01T10:30:00Z"}
+  },
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439012"},
+    "guidId": "550e8400-e29b-41d4-a716-446655440002",
+    "titulo": "Red corporativa lenta",
+    "descripcion": "Se experimenta congestión en la red. Ancho de banda utilizado al 85%. Investigar origen del tráfico anómalo.",
+    "estado": "En Proceso",
+    "prioridad": "Alta",
+    "fechaCreacion": {"$date": "2026-02-01T11:00:00Z"},
+    "ultimaActualizacion": {"$date": "2026-02-02T08:15:00Z"}
+  },
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439013"},
+    "guidId": "550e8400-e29b-41d4-a716-446655440003",
+    "titulo": "Actualizaciones de seguridad pendientes",
+    "descripcion": "Se deben aplicar los parches de seguridad mensuales en todos los servidores Windows.",
+    "estado": "Abierta",
+    "prioridad": "Media",
+    "fechaCreacion": {"$date": "2026-02-02T09:00:00Z"},
+    "ultimaActualizacion": {"$date": "2026-02-02T09:00:00Z"}
+  },
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439014"},
+    "guidId": "550e8400-e29b-41d4-a716-446655440004",
+    "titulo": "Disco C: lleno en workstation",
+    "descripcion": "Usuario reporta que el disco C tiene 98% de utilización. Limpiar archivos temporales.",
+    "estado": "Cerrada",
+    "prioridad": "Baja",
+    "fechaCreacion": {"$date": "2026-02-01T14:30:00Z"},
+    "ultimaActualizacion": {"$date": "2026-02-01T16:45:00Z"}
+  },
+  {
+    "_id": {"$oid": "507f1f77bcf86cd799439015"},
+    "guidId": "550e8400-e29b-41d4-a716-446655440005",
+    "titulo": "Fallo en respaldo diario",
+    "descripcion": "El script de backup no completó correctamente. Base de datos de producción sin respaldo desde ayer.",
+    "estado": "En Proceso",
+    "prioridad": "Crítica",
+    "fechaCreacion": {"$date": "2026-02-02T06:00:00Z"},
+    "ultimaActualizacion": {"$date": "2026-02-02T10:00:00Z"}
+  }
+]

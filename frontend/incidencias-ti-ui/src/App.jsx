@@ -1,11 +1,30 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import Incidencias from "./pages/Incidencias";
+import { useState } from "react";
+import Navigation from "./components/Navigation";
+import Incidencias from "./pages/Incidencias2";
+import Dashboard from "./components/Dashboard";
+import "./styles/global.css";
 
 function App() {
-  return <Incidencias />;
+  const [currentPage, setCurrentPage] = useState("incidencias");
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case "dashboard":
+        return <Dashboard />;
+      case "incidencias":
+      default:
+        return <Incidencias />;
+    }
+  };
+
+  return (
+    <div className="app">
+      <Navigation onNavigate={setCurrentPage} currentPage={currentPage} />
+      <main className="app-main">
+        {renderPage()}
+      </main>
+    </div>
+  );
 }
 
 export default App;
