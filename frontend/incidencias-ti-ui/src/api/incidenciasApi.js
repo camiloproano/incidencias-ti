@@ -7,4 +7,6 @@ const api = axios.create({
 export const obtenerIncidencias = () => api.get("/");
 export const crearIncidencia = (data) => api.post("/", data);
 export const eliminarIncidencia = (id) => api.delete(`/${id}`);
+export const actualizarIncidencia = (id, data) =>
+  api.put(`/${id}`, data);
 
