@@ -23,56 +23,7 @@ namespace IncidenciasTI.API.Controllers
             _syncService = syncService;
         }
 
-        // GET: api/mongo/incidencias
-        [HttpGet]
-        public async Task<IActionResult> GetAll()
-        {
-            var logs = await _logService.ObtenerLogsAsync();
-            var incidencias = logs
-                .Where(l => l.Datos != null && l.Acción != "Eliminación")
-                .GroupBy(l => l.IncidenciaId)
-                .Select(g => g.OrderByDescending(l => l.Fecha).First())
-                .Select(l => new IncidenciaDto
-                {
-                    Id = l.IncidenciaId.ToString(),
-                    Titulo = l.Datos!.Titulo,
-                    Descripcion = l.Datos!.Descripcion,
-                    Estado = l.Datos!.Estado,
-                    Prioridad = l.Datos!.Prioridad,
-                    FechaCreacion = l.Datos!.FechaCreacion,
-                    UltimaActualizacion = l.Datos!.UltimaActualizacion
-                })
-                .ToList();
 
-            return Ok(incidencias);
-        }
-
-        // GET: api/mongo/incidencias/5
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
-        {
-            var logs = await _logService.ObtenerLogsAsync();
-            var latestLog = logs
-                .Where(l => l.IncidenciaId == id && l.Datos != null && l.Acción != "Eliminación")
-                .OrderByDescending(l => l.Fecha)
-                .FirstOrDefault();
-
-            if (latestLog == null)
-                return NotFound("Incidencia no encontrada en MongoDB");
-
-            var incidenciaDto = new IncidenciaDto
-            {
-                Id = latestLog.IncidenciaId.ToString(),
-                Titulo = latestLog.Datos!.Titulo,
-                Descripcion = latestLog.Datos!.Descripcion,
-                Estado = latestLog.Datos!.Estado,
-                Prioridad = latestLog.Datos!.Prioridad,
-                FechaCreacion = latestLog.Datos!.FechaCreacion,
-                UltimaActualizacion = latestLog.Datos!.UltimaActualizacion
-            };
-
-            return Ok(incidenciaDto);
-        }
 
         // POST: api/mongo/incidencias
         [HttpPost]
@@ -116,15 +67,7 @@ namespace IncidenciasTI.API.Controllers
                     Acción = "Creación",
                     Usuario = createDto.Usuario ?? "Desconocido",
                     Fecha = DateTime.UtcNow,
-                    Datos = new IncidenciaData
-                    {
-                        Titulo = nuevaIncidencia.Titulo,
-                        Descripcion = nuevaIncidencia.Descripcion,
-                        Estado = nuevaIncidencia.Estado,
-                        Prioridad = nuevaIncidencia.Prioridad,
-                        FechaCreacion = nuevaIncidencia.FechaCreacion,
-                        UltimaActualizacion = nuevaIncidencia.UltimaActualizacion
-                    }
+                    Datos = null // Solo auditoría, sin datos completos
                 });
                 Console.WriteLine($"[DEBUG-Mongo] Log creado exitosamente para incidencia ID={maxId}");
             }
@@ -146,7 +89,7 @@ namespace IncidenciasTI.API.Controllers
                 UltimaActualizacion = nuevaIncidencia.UltimaActualizacion
             };
 
-            return CreatedAtAction(nameof(GetById), new { id = nuevaIncidencia.Id }, incidenciaDto);
+            return Ok(incidenciaDto);
         }
 
         // PUT: api/mongo/incidencias/5
@@ -155,24 +98,12 @@ namespace IncidenciasTI.API.Controllers
         {
             try
             {
+                // Verificar que existe algún log para esta incidencia
                 var logs = await _logService.ObtenerLogsAsync();
-                var latestLog = logs
-                    .Where(l => l.IncidenciaId == id && l.Datos != null && l.Acción != "Eliminación")
-                    .OrderByDescending(l => l.Fecha)
-                    .FirstOrDefault();
+                var exists = logs.Any(l => l.IncidenciaId == id && l.Acción != "Eliminación");
 
-                if (latestLog == null)
+                if (!exists)
                     return NotFound("Incidencia no encontrada en MongoDB");
-
-                var updatedData = new IncidenciaData
-                {
-                    Titulo = updateDto.Titulo ?? latestLog.Datos!.Titulo,
-                    Descripcion = updateDto.Descripcion ?? latestLog.Datos!.Descripcion,
-                    Estado = updateDto.Estado ?? latestLog.Datos!.Estado,
-                    Prioridad = updateDto.Prioridad ?? latestLog.Datos!.Prioridad,
-                    FechaCreacion = latestLog.Datos!.FechaCreacion,
-                    UltimaActualizacion = DateTime.UtcNow
-                };
 
                 Console.WriteLine($"[DEBUG-Mongo] Intentando crear log de actualización para incidencia ID={id}");
                 await _logService.CrearLogAsync(new IncidenciaLog
@@ -181,7 +112,7 @@ namespace IncidenciasTI.API.Controllers
                     Acción = "Actualización",
                     Usuario = updateDto.Usuario ?? "Desconocido",
                     Fecha = DateTime.UtcNow,
-                    Datos = updatedData
+                    Datos = null // Solo auditoría, sin datos completos
                 });
                 Console.WriteLine($"[DEBUG-Mongo] Log de actualización creado exitosamente para incidencia ID={id}");
             }
@@ -211,7 +142,7 @@ namespace IncidenciasTI.API.Controllers
                 Acción = "Eliminación",
                 Usuario = "Sistema",
                 Fecha = DateTime.UtcNow,
-                Datos = null // No data needed for deletion
+                Datos = null // Solo auditoría, sin datos completos
             });
 
             return NoContent();

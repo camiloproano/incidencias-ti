@@ -2,6 +2,7 @@ using IncidenciasTI.API.Data;
 using IncidenciasTI.API.Models;
 using IncidenciasTI.Models;
 using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 
 namespace IncidenciasTI.Services
 {
@@ -9,118 +10,108 @@ namespace IncidenciasTI.Services
     {
         private readonly AppDbContext _context;
         private readonly LogService _logService;
+        private readonly IMongoDatabase _mongoDatabase;
 
-        public SyncService(AppDbContext context, LogService logService)
+        public SyncService(AppDbContext context, LogService logService, IMongoDatabase mongoDatabase)
         {
             _context = context;
             _logService = logService;
+            _mongoDatabase = mongoDatabase;
         }
 
         public async Task SincronizarAsync()
         {
+            // ✅ NUEVA LÓGICA: Lee logs de auditoría para saber QUÉ cambió
+            // Luego lee los datos COMPLETOS de PostgreSQL
+            // Finalmente replica a MongoDB
+            
             var logs = await _logService.ObtenerLogsAsync();
+            var mongoCollection = _mongoDatabase.GetCollection<IncidenciaMongo>("IncidenciasDirect");
+            int syncCount = 0;
 
             foreach (var log in logs.OrderBy(l => l.Fecha))
             {
-                if (log.Datos == null) continue; // Skip logs without data
+                // Skip sync-generated logs to prevent infinite loops
+                if (log.Acción.StartsWith("Sincronización-")) continue;
 
-                var existingIncidencia = await _context.Incidencias.FindAsync(log.IncidenciaId);
+                Console.WriteLine($"[SYNC] Procesando log: ID={log.IncidenciaId}, Acción={log.Acción}");
+
+                // ✅ CAMBIO: No leemos datos del log, leemos directamente de PostgreSQL
+                var incidenciaEnSQL = await _context.Incidencias.FirstOrDefaultAsync(i => i.Id == log.IncidenciaId);
 
                 switch (log.Acción)
                 {
                     case "Creación":
-                        if (existingIncidencia == null)
+                        if (incidenciaEnSQL != null)
                         {
-                            var nuevaIncidencia = new IncidenciaSql
+                            // Verificar si ya existe en MongoDB
+                            var existeEnMongo = await mongoCollection.Find(i => i.GuidId == incidenciaEnSQL.GuidId).FirstOrDefaultAsync();
+                            
+                            if (existeEnMongo == null)
                             {
-                                Id = log.IncidenciaId,
-                                Titulo = log.Datos.Titulo,
-                                Descripcion = log.Datos.Descripcion,
-                                Estado = log.Datos.Estado,
-                                Prioridad = log.Datos.Prioridad,
-                                FechaCreacion = log.Datos.FechaCreacion,
-                                UltimaActualizacion = log.Datos.UltimaActualizacion
-                            };
-                            await _context.Incidencias.AddAsync(nuevaIncidencia);
-                            // Also create a log entry documenting the sync-created record
-                            try
-                            {
-                                await _logService.CrearLogAsync(new IncidenciaLog
+                                var incidenciaMongo = new IncidenciaMongo
                                 {
-                                    IncidenciaId = nuevaIncidencia.Id,
-                                    Acción = "Sincronización-Creación",
-                                    Usuario = "SyncService",
-                                    Fecha = DateTime.UtcNow,
-                                    Datos = new IncidenciaData
-                                    {
-                                        Titulo = nuevaIncidencia.Titulo,
-                                        Descripcion = nuevaIncidencia.Descripcion,
-                                        Estado = nuevaIncidencia.Estado,
-                                        Prioridad = nuevaIncidencia.Prioridad,
-                                        FechaCreacion = nuevaIncidencia.FechaCreacion,
-                                        UltimaActualizacion = nuevaIncidencia.UltimaActualizacion
-                                    }
-                                });
+                                    GuidId = incidenciaEnSQL.GuidId,
+                                    Titulo = incidenciaEnSQL.Titulo,
+                                    Descripcion = incidenciaEnSQL.Descripcion,
+                                    Estado = incidenciaEnSQL.Estado,
+                                    Prioridad = incidenciaEnSQL.Prioridad,
+                                    FechaCreacion = incidenciaEnSQL.FechaCreacion,
+                                    UltimaActualizacion = incidenciaEnSQL.UltimaActualizacion
+                                };
+                                await mongoCollection.InsertOneAsync(incidenciaMongo);
+                                Console.WriteLine($"[SYNC] ✅ Creación: Incidencia ID={log.IncidenciaId} ({incidenciaEnSQL.Titulo}) replicada a MongoDB");
+                                syncCount++;
                             }
-                            catch {
-                                // swallow to avoid breaking sync on logging failure
+                            else
+                            {
+                                Console.WriteLine($"[SYNC] ⏭️ Creación: Incidencia ID={log.IncidenciaId} ya existe en MongoDB, omitiendo");
                             }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[SYNC] ⚠️ Creación: Incidencia ID={log.IncidenciaId} NO existe en PostgreSQL");
                         }
                         break;
 
                     case "Actualización":
-                        if (existingIncidencia != null)
+                        if (incidenciaEnSQL != null)
                         {
-                            existingIncidencia.Titulo = log.Datos.Titulo;
-                            existingIncidencia.Descripcion = log.Datos.Descripcion;
-                            existingIncidencia.Estado = log.Datos.Estado;
-                            existingIncidencia.Prioridad = log.Datos.Prioridad;
-                            existingIncidencia.UltimaActualizacion = log.Datos.UltimaActualizacion;
-                            // FechaCreacion should not be updated
-                            // Also create a log entry documenting the sync update
-                            try
+                            var filter = Builders<IncidenciaMongo>.Filter.Eq(i => i.GuidId, incidenciaEnSQL.GuidId);
+                            var update = Builders<IncidenciaMongo>.Update
+                                .Set(i => i.Titulo, incidenciaEnSQL.Titulo)
+                                .Set(i => i.Descripcion, incidenciaEnSQL.Descripcion)
+                                .Set(i => i.Estado, incidenciaEnSQL.Estado)
+                                .Set(i => i.Prioridad, incidenciaEnSQL.Prioridad)
+                                .Set(i => i.UltimaActualizacion, incidenciaEnSQL.UltimaActualizacion);
+
+                            var result = await mongoCollection.UpdateOneAsync(filter, update);
+                            
+                            if (result.MatchedCount > 0)
                             {
-                                await _logService.CrearLogAsync(new IncidenciaLog
-                                {
-                                    IncidenciaId = existingIncidencia.Id,
-                                    Acción = "Sincronización-Actualización",
-                                    Usuario = "SyncService",
-                                    Fecha = DateTime.UtcNow,
-                                    Datos = new IncidenciaData
-                                    {
-                                        Titulo = existingIncidencia.Titulo,
-                                        Descripcion = existingIncidencia.Descripcion,
-                                        Estado = existingIncidencia.Estado,
-                                        Prioridad = existingIncidencia.Prioridad,
-                                        FechaCreacion = existingIncidencia.FechaCreacion,
-                                        UltimaActualizacion = existingIncidencia.UltimaActualizacion
-                                    }
-                                });
+                                Console.WriteLine($"[SYNC] ✅ Actualización: Incidencia ID={log.IncidenciaId} actualizada en MongoDB");
+                                syncCount++;
                             }
-                            catch {
-                                // swallow to avoid breaking sync on logging failure
+                            else
+                            {
+                                Console.WriteLine($"[SYNC] ⚠️ Actualización: Incidencia ID={log.IncidenciaId} NO existe en MongoDB para actualizar");
                             }
                         }
                         break;
 
                     case "Eliminación":
-                        if (existingIncidencia != null)
+                        // Para eliminación, necesitamos buscar por ID del log (que ya no existe en SQL)
+                        // Buscar en logs anteriores para obtener el GUID
+                        var guidAnterior = await ObtenerGuidDelLogAnteriorAsync(log.IncidenciaId);
+                        if (guidAnterior != Guid.Empty)
                         {
-                            _context.Incidencias.Remove(existingIncidencia);
-                            // Also create a log entry documenting the sync deletion
-                            try
+                            var filter = Builders<IncidenciaMongo>.Filter.Eq(i => i.GuidId, guidAnterior);
+                            var result = await mongoCollection.DeleteOneAsync(filter);
+                            
+                            if (result.DeletedCount > 0)
                             {
-                                await _logService.CrearLogAsync(new IncidenciaLog
-                                {
-                                    IncidenciaId = existingIncidencia.Id,
-                                    Acción = "Sincronización-Eliminación",
-                                    Usuario = "SyncService",
-                                    Fecha = DateTime.UtcNow,
-                                    Datos = null
-                                });
-                            }
-                            catch {
-                                // swallow to avoid breaking sync on logging failure
+                                Console.WriteLine($"[SYNC] ✅ Eliminación: Incidencia ID={log.IncidenciaId} eliminada de MongoDB");
+                                syncCount++;
                             }
                         }
                         break;
@@ -128,6 +119,17 @@ namespace IncidenciasTI.Services
             }
 
             await _context.SaveChangesAsync();
+            Console.WriteLine($"[SYNC] ✅ Sincronización completada: {syncCount} operaciones procesadas");
+        }
+
+        private async Task<Guid> ObtenerGuidDelLogAnteriorAsync(int incidenciaId)
+        {
+            // Buscar en SQL si aún existe (sino, buscar en MongoDB por ID)
+            var incidencia = await _context.Incidencias.FirstOrDefaultAsync(i => i.Id == incidenciaId);
+            if (incidencia != null)
+                return incidencia.GuidId;
+
+            return Guid.Empty;
         }
     }
 }

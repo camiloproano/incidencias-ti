@@ -44,6 +44,7 @@ namespace IncidenciasTI.API.Controllers
             var incidenciasDto = incidencias.Select(i => new IncidenciaDto
             {
                 Id = i.Id.ToString(),
+                GuidId = i.GuidId,
                 Titulo = i.Titulo,
                 Descripcion = i.Descripcion,
                 Estado = i.Estado,
@@ -79,6 +80,7 @@ namespace IncidenciasTI.API.Controllers
             var incidenciaDto = new IncidenciaDto
             {
                 Id = incidencia.Id.ToString(),
+                GuidId = incidencia.GuidId,
                 Titulo = incidencia.Titulo,
                 Descripcion = incidencia.Descripcion,
                 Estado = incidencia.Estado,
@@ -95,10 +97,31 @@ namespace IncidenciasTI.API.Controllers
         public async Task<IActionResult> Create([FromBody] CreateIncidenciaDto createDto)
         {
             if (createDto == null)
-                return BadRequest();
+            {
+                // Intentamos leer el cuerpo bruto para diagnóstico (útil en dev/testing)
+                try
+                {
+                    Request.EnableBuffering();
+                    using var reader = new System.IO.StreamReader(Request.Body, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+                    var rawBody = await reader.ReadToEndAsync();
+                    Request.Body.Position = 0;
+                    Console.WriteLine($"[DEBUG] POST /api/incidencias - model binding failed. Raw body:\n{rawBody}");
+                    return BadRequest(new {
+                        error = "Invalid or malformed JSON in request body.",
+                        hint = "Ensure Content-Type: application/json and that string values do not contain unescaped raw newlines (\n).",
+                        rawBody
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ERROR] Reading raw request body failed: {ex.Message}");
+                    return BadRequest(new { error = "Invalid request body and raw body could not be read." });
+                }
+            }
 
             var nuevaIncidencia = new Incidencia
             {
+                GuidId = Guid.NewGuid(), // ✅ IMPORTANTE: Generar GUID único para sincronización
                 Titulo = createDto.Titulo,
                 Descripcion = createDto.Descripcion,
                 Prioridad = createDto.Prioridad,
@@ -109,36 +132,32 @@ namespace IncidenciasTI.API.Controllers
 
             await _context.Incidencias.AddAsync(nuevaIncidencia);
             await _context.SaveChangesAsync();
+            
+            // ✅ AUDITORÍA: Registrar la operación (NO replicar datos completos)
             try
             {
-                Console.WriteLine($"[DEBUG] Intentando crear log para incidencia ID={nuevaIncidencia.Id}");
+                Console.WriteLine($"[AUDIT] POST SQL: Creación de incidencia ID={nuevaIncidencia.Id}, GUID={nuevaIncidencia.GuidId}");
                 await _logService.CrearLogAsync(new IncidenciaLog
                 {
                     IncidenciaId = nuevaIncidencia.Id,
                     Acción = "Creación",
                     Usuario = createDto.Usuario ?? "Desconocido",
-                    Fecha = DateTime.UtcNow,
-                    Datos = new IncidenciaData
-                    {
-                        Titulo = nuevaIncidencia.Titulo,
-                        Descripcion = nuevaIncidencia.Descripcion,
-                        Estado = nuevaIncidencia.Estado,
-                        Prioridad = nuevaIncidencia.Prioridad,
-                        FechaCreacion = nuevaIncidencia.FechaCreacion,
-                        UltimaActualizacion = nuevaIncidencia.UltimaActualizacion
-                    }
+                    Fecha = DateTime.UtcNow
+                    // ⚠️ NOTA: NO guardamos Datos aquí. Solo registramos QUE se creó, no replicamos el contenido.
+                    // La sincronización manual (POST /sync) es la que replica datos cuando se necesita.
                 });
-                Console.WriteLine($"[DEBUG] Log creado exitosamente para incidencia ID={nuevaIncidencia.Id}");
+                Console.WriteLine($"[AUDIT] ✅ Log registrado para auditoría");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] Error guardando log en MongoDB para incidencia ID={nuevaIncidencia.Id}: {ex.Message}");
-                Console.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
+                Console.WriteLine($"[AUDIT] ⚠️ Error registrando log en MongoDB: {ex.Message}");
+                // No fallar la creación si MongoDB está down - la incidencia ya está en SQL
             }
                         
             var incidenciaDto = new IncidenciaDto
             {
                 Id = nuevaIncidencia.Id.ToString(),
+                GuidId = nuevaIncidencia.GuidId,
                 Titulo = nuevaIncidencia.Titulo,
                 Descripcion = nuevaIncidencia.Descripcion,
                 Estado = nuevaIncidencia.Estado,
@@ -241,6 +260,33 @@ namespace IncidenciasTI.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, $"Error durante la sincronización: {ex.Message}");
+            }
+        }
+
+        // DEBUG: GET all logs from MongoDB
+        [HttpGet("debug/logs")]
+        public async Task<IActionResult> GetAllLogs()
+        {
+            try
+            {
+                var logs = await _logService.ObtenerLogsAsync();
+                return Ok(new 
+                { 
+                    totalLogs = logs.Count,
+                    logs = logs.Select(l => new 
+                    {
+                        id = l.Id,
+                        incidenciaId = l.IncidenciaId,
+                        acción = l.Acción,
+                        usuario = l.Usuario,
+                        fecha = l.Fecha,
+                        datosNull = l.Datos == null
+                    }).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error al obtener logs: {ex.Message}");
             }
         }
     }

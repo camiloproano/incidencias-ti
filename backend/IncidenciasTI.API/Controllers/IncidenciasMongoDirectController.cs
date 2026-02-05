@@ -4,6 +4,7 @@ using IncidenciasTI.API.DTOs;
 using MongoDB.Driver;
 using System;
 using IncidenciasTI.Services;
+using IncidenciasTI.Models;
 namespace IncidenciasTI.API.Controllers
 {
     [ApiController]
@@ -64,34 +65,72 @@ namespace IncidenciasTI.API.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateIncidenciaDto createDto)
         {
-            if (string.IsNullOrWhiteSpace(createDto.Titulo) || string.IsNullOrWhiteSpace(createDto.Descripcion))
-                return BadRequest("Titulo y Descripcion son obligatorios.");
-
-            var nuevaIncidencia = new IncidenciaMongo
+            try
             {
-                GuidId = Guid.NewGuid(), // ID seguro y único
-                Titulo = createDto.Titulo,
-                Descripcion = createDto.Descripcion,
-                Estado = "Abierta", // unificado con PostgreSQL
-                Prioridad = createDto.Prioridad,
-                FechaCreacion = DateTime.UtcNow,
-                UltimaActualizacion = DateTime.UtcNow
-            };
+                // Validación explícita
+                if (createDto == null)
+                {
+                    Console.WriteLine("[ERROR-POST] createDto es NULL");
+                    return BadRequest(new { error = "El cuerpo de la solicitud es requerido" });
+                }
 
-            await _incidencias.InsertOneAsync(nuevaIncidencia);
+                if (string.IsNullOrWhiteSpace(createDto.Titulo))
+                    return BadRequest(new { error = "Titulo es obligatorio" });
 
-            var incidenciaDto = new IncidenciaDto
+                if (string.IsNullOrWhiteSpace(createDto.Descripcion))
+                    return BadRequest(new { error = "Descripcion es obligatoria" });
+
+                Console.WriteLine($"[MONGO-POST] Creando incidencia: {createDto.Titulo}");
+
+                var nuevaIncidencia = new IncidenciaMongo
+                {
+                    GuidId = Guid.NewGuid(),
+                    Titulo = createDto.Titulo.Trim(),
+                    Descripcion = createDto.Descripcion.Trim(),
+                    Estado = "Abierta",
+                    Prioridad = string.IsNullOrWhiteSpace(createDto.Prioridad) ? "Media" : createDto.Prioridad,
+                    FechaCreacion = DateTime.UtcNow,
+                    UltimaActualizacion = DateTime.UtcNow
+                };
+
+                await _incidencias.InsertOneAsync(nuevaIncidencia);
+                Console.WriteLine($"[MONGO-POST] ✅ Incidencia guardada en IncidenciasDirect con GuidId: {nuevaIncidencia.GuidId}");
+
+                // ✅ AUDITORÍA: Registrar la operación en IncidenciaLogs
+                try
+                {
+                    await _incidencias.Database.GetCollection<IncidenciaLog>("IncidenciaLogs").InsertOneAsync(new IncidenciaLog
+                    {
+                        Acción = "Creación",
+                        Usuario = createDto.Usuario ?? "Desconocido",
+                        Fecha = DateTime.UtcNow
+                        // ⚠️ NOTA: Solo auditamos la operación, sin duplicar datos
+                    });
+                    Console.WriteLine($"[AUDIT] ✅ Operación registrada en IncidenciaLogs");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[AUDIT] ⚠️ Error registrando auditoría: {ex.Message}");
+                }
+
+                var incidenciaDto = new IncidenciaDto
+                {
+                    Id = nuevaIncidencia.Id,
+                    Titulo = nuevaIncidencia.Titulo,
+                    Descripcion = nuevaIncidencia.Descripcion,
+                    Estado = nuevaIncidencia.Estado,
+                    Prioridad = nuevaIncidencia.Prioridad,
+                    FechaCreacion = nuevaIncidencia.FechaCreacion,
+                    UltimaActualizacion = nuevaIncidencia.UltimaActualizacion
+                };
+
+                return CreatedAtAction(nameof(GetById), new { id = nuevaIncidencia.GuidId }, incidenciaDto);
+            }
+            catch (Exception ex)
             {
-                Id = nuevaIncidencia.Id,
-                Titulo = nuevaIncidencia.Titulo,
-                Descripcion = nuevaIncidencia.Descripcion,
-                Estado = nuevaIncidencia.Estado,
-                Prioridad = nuevaIncidencia.Prioridad,
-                FechaCreacion = nuevaIncidencia.FechaCreacion,
-                UltimaActualizacion = nuevaIncidencia.UltimaActualizacion
-            };
-
-            return CreatedAtAction(nameof(GetById), new { id = nuevaIncidencia.GuidId }, incidenciaDto);
+                Console.WriteLine($"[ERROR-POST] Excepción: {ex.Message}");
+                return StatusCode(500, new { error = "Error al crear incidencia", detalles = ex.Message });
+            }
         }
 
         // PUT: api/mongo/direct/incidencias/{id}

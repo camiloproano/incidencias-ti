@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { obtenerIncidencias, crearIncidencia, eliminarIncidencia, actualizarIncidencia } from "../api/incidenciasApi";
+import { obtenerIncidencias, crearIncidencia, eliminarIncidencia, actualizarIncidencia, sincronizarDesdeLogs, sincronizarDesdeMongoDirecto } from "../api/incidenciasApi";
 import Header from "../components/Header";
 import IncidenciaForm from "../components/IncidenciaForm";
 import IncidenciaCard from "../components/IncidenciaCard";
@@ -36,6 +36,34 @@ export default function Incidencias() {
   useEffect(() => {
     cargarIncidencias();
   }, []);
+
+  const ejecutarSincronizacionLogs = async () => {
+    try {
+      setLoading(true);
+      const res = await sincronizarDesdeLogs();
+      setAlert({ type: "success", message: `✅ Sincronización (logs→SQL) completada: ${res.data}` });
+      await cargarIncidencias();
+    } catch (error) {
+      setAlert({ type: "danger", message: "❌ Error al sincronizar desde logs" });
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const ejecutarSincronizacionMongoDirecto = async () => {
+    try {
+      setLoading(true);
+      const res = await sincronizarDesdeMongoDirecto();
+      setAlert({ type: "success", message: `✅ Sincronización (MongoDirect→SQL) completada: ${res.data}` });
+      await cargarIncidencias();
+    } catch (error) {
+      setAlert({ type: "danger", message: "❌ Error al sincronizar desde MongoDB Directo" });
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const agregarIncidencia = async () => {
     if (!titulo.trim()) {
@@ -95,6 +123,10 @@ export default function Incidencias() {
       <Header />
       
       <div className="container">
+        <div className="sync-controls" style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <button className="btn" onClick={ejecutarSincronizacionLogs}>Sincronizar Logs → SQL</button>
+          <button className="btn" onClick={ejecutarSincronizacionMongoDirecto}>Sincronizar MongoDirect → SQL</button>
+        </div>
         <IncidenciaForm
           titulo={titulo}
           setTitulo={setTitulo}

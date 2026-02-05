@@ -1,11 +1,1 @@
-{
-  "Version": 1,
-  "Hash": "zgtbO7BGUZ2lLxXhCw79nZ8gnGCsULyE0dAYuOrP1wY=",
-  "Source": "IncidenciasTI.API",
-  "BasePath": "_content/IncidenciasTI.API",
-  "Mode": "Default",
-  "ManifestType": "Build",
-  "ReferencedProjectsConfiguration": [],
-  "DiscoveryPatterns": [],
-  "Assets": []
-}
+{"Version":1,"Hash":"LxZ1cdxPwGOlAcNuhXiCCKNb81vv12BZdIS8KpGfFPI=","Source":"IncidenciasTI.API","BasePath":"_content/IncidenciasTI.API","Mode":"Default","ManifestType":"Build","ReferencedProjectsConfiguration":[],"DiscoveryPatterns":[],"Assets":[],"Endpoints":[]}

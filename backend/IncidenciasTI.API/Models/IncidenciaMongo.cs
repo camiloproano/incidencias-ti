@@ -11,6 +11,7 @@ namespace IncidenciasTI.API.Models
         [BsonRepresentation(BsonType.ObjectId)]
         public string? Id { get; set; }
 
+        [BsonRepresentation(BsonType.String)] // ✅ IMPORTANTE: Serializar GUID como string en MongoDB
         public Guid GuidId { get; set; }
 
         public string Titulo { get; set; } = null!;
