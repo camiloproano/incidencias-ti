@@ -26,5 +26,6 @@ export const eliminarIncidencia = (id) => api.delete(`/${id}`);
 export const actualizarIncidencia = (id, data) => api.put(`/${id}`, data);
 export const sincronizarDesdeLogs = () => axios.post(`${API_URL}/incidencias/sync`);
 export const sincronizarDesdeMongoDirecto = () => axios.post(`${API_URL}/mongo/direct/incidencias/sync`);
+export const sincronizarDesdeSqlAMongo = () => axios.post(`${API_URL}/incidencias/sync`);
 export default api;
 

@@ -77,24 +77,52 @@ namespace IncidenciasTI.Services
                     case "Actualización":
                         if (incidenciaEnSQL != null)
                         {
-                            var filter = Builders<IncidenciaMongo>.Filter.Eq(i => i.GuidId, incidenciaEnSQL.GuidId);
-                            var update = Builders<IncidenciaMongo>.Update
-                                .Set(i => i.Titulo, incidenciaEnSQL.Titulo)
-                                .Set(i => i.Descripcion, incidenciaEnSQL.Descripcion)
-                                .Set(i => i.Estado, incidenciaEnSQL.Estado)
-                                .Set(i => i.Prioridad, incidenciaEnSQL.Prioridad)
-                                .Set(i => i.UltimaActualizacion, incidenciaEnSQL.UltimaActualizacion);
+                            // Obtener la versión actual en MongoDB para comparar timestamps
+                            var mongoIncidencia = await mongoCollection.Find(i => i.GuidId == incidenciaEnSQL.GuidId).FirstOrDefaultAsync();
 
-                            var result = await mongoCollection.UpdateOneAsync(filter, update);
-                            
-                            if (result.MatchedCount > 0)
+                            if (mongoIncidencia != null)
                             {
-                                Console.WriteLine($"[SYNC] ✅ Actualización: Incidencia ID={log.IncidenciaId} actualizada en MongoDB");
-                                syncCount++;
+                                // Comparar UltimaActualizacion para resolver conflictos
+                                if (incidenciaEnSQL.UltimaActualizacion > mongoIncidencia.UltimaActualizacion)
+                                {
+                                    // SQL es más reciente - actualizar MongoDB
+                                    var filter = Builders<IncidenciaMongo>.Filter.Eq(i => i.GuidId, incidenciaEnSQL.GuidId);
+                                    var update = Builders<IncidenciaMongo>.Update
+                                        .Set(i => i.Titulo, incidenciaEnSQL.Titulo)
+                                        .Set(i => i.Descripcion, incidenciaEnSQL.Descripcion)
+                                        .Set(i => i.Estado, incidenciaEnSQL.Estado)
+                                        .Set(i => i.Prioridad, incidenciaEnSQL.Prioridad)
+                                        .Set(i => i.UltimaActualizacion, incidenciaEnSQL.UltimaActualizacion);
+
+                                    var result = await mongoCollection.UpdateOneAsync(filter, update);
+                                    
+                                    if (result.MatchedCount > 0)
+                                    {
+                                        Console.WriteLine($"[SYNC] ✅ Actualización: Incidencia ID={log.IncidenciaId} actualizada en MongoDB (SQL más reciente)");
+                                        syncCount++;
+                                    }
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"[SYNC] ⏭️ Actualización: Incidencia ID={log.IncidenciaId} NO actualizada en MongoDB (MongoDB más reciente: {mongoIncidencia.UltimaActualizacion} vs SQL: {incidenciaEnSQL.UltimaActualizacion})");
+                                }
                             }
                             else
                             {
-                                Console.WriteLine($"[SYNC] ⚠️ Actualización: Incidencia ID={log.IncidenciaId} NO existe en MongoDB para actualizar");
+                                // No existe en MongoDB - crear nuevo documento
+                                var nuevaIncidenciaMongo = new IncidenciaMongo
+                                {
+                                    GuidId = incidenciaEnSQL.GuidId,
+                                    Titulo = incidenciaEnSQL.Titulo,
+                                    Descripcion = incidenciaEnSQL.Descripcion,
+                                    Estado = incidenciaEnSQL.Estado,
+                                    Prioridad = incidenciaEnSQL.Prioridad,
+                                    FechaCreacion = incidenciaEnSQL.FechaCreacion,
+                                    UltimaActualizacion = incidenciaEnSQL.UltimaActualizacion
+                                };
+                                await mongoCollection.InsertOneAsync(nuevaIncidenciaMongo);
+                                Console.WriteLine($"[SYNC] ✅ Actualización: Incidencia ID={log.IncidenciaId} creada en MongoDB (no existía)");
+                                syncCount++;
                             }
                         }
                         break;

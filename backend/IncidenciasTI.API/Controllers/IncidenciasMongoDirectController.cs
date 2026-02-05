@@ -28,6 +28,7 @@ namespace IncidenciasTI.API.Controllers
             var incidenciasDto = incidencias.Select(i => new IncidenciaDto
             {
                 Id = i.Id,
+                GuidId = i.GuidId,
                 Titulo = i.Titulo,
                 Descripcion = i.Descripcion,
                 Estado = i.Estado,
@@ -50,6 +51,7 @@ namespace IncidenciasTI.API.Controllers
             var incidenciaDto = new IncidenciaDto
             {
                 Id = incidencia.Id,
+                GuidId = incidencia.GuidId,
                 Titulo = incidencia.Titulo,
                 Descripcion = incidencia.Descripcion,
                 Estado = incidencia.Estado,
@@ -141,14 +143,17 @@ namespace IncidenciasTI.API.Controllers
             if (incidencia == null)
                 return NotFound("Incidencia no encontrada en MongoDB");
 
-            if (string.IsNullOrWhiteSpace(updateDto.Titulo) && string.IsNullOrWhiteSpace(updateDto.Descripcion))
-                return BadRequest("Debe proporcionar al menos Titulo o Descripcion.");
+            // Build update definition dynamically based on provided fields
+            var update = Builders<IncidenciaMongo>.Update.Set(i => i.UltimaActualizacion, DateTime.UtcNow);
 
-            var update = Builders<IncidenciaMongo>.Update
-                .Set(i => i.Titulo, updateDto.Titulo ?? incidencia.Titulo)
-                .Set(i => i.Descripcion, updateDto.Descripcion ?? incidencia.Descripcion)
-                .Set(i => i.Prioridad, updateDto.Prioridad ?? incidencia.Prioridad)
-                .Set(i => i.UltimaActualizacion, DateTime.UtcNow);
+            if (!string.IsNullOrWhiteSpace(updateDto.Titulo))
+                update = update.Set(i => i.Titulo, updateDto.Titulo);
+
+            if (!string.IsNullOrWhiteSpace(updateDto.Descripcion))
+                update = update.Set(i => i.Descripcion, updateDto.Descripcion);
+
+            if (!string.IsNullOrWhiteSpace(updateDto.Prioridad))
+                update = update.Set(i => i.Prioridad, updateDto.Prioridad);
 
             if (!string.IsNullOrEmpty(updateDto.Estado))
                 update = update.Set(i => i.Estado, updateDto.Estado);

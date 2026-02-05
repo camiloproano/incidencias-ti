@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { obtenerIncidencias, crearIncidencia, eliminarIncidencia, actualizarIncidencia, sincronizarDesdeLogs, sincronizarDesdeMongoDirecto } from "../api/incidenciasApi";
+import { obtenerIncidencias, crearIncidencia, eliminarIncidencia, actualizarIncidencia, sincronizarDesdeLogs, sincronizarDesdeMongoDirecto, sincronizarDesdeSqlAMongo } from "../api/incidenciasApi";
 import Header from "../components/Header";
 import IncidenciaForm from "../components/IncidenciaForm";
 import IncidenciaCard from "../components/IncidenciaCard";
@@ -59,6 +59,20 @@ export default function Incidencias() {
       await cargarIncidencias();
     } catch (error) {
       setAlert({ type: "danger", message: "❌ Error al sincronizar desde MongoDB Directo" });
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const ejecutarSincronizacionSqlAMongo = async () => {
+    try {
+      setLoading(true);
+      const res = await sincronizarDesdeSqlAMongo();
+      setAlert({ type: "success", message: `✅ Sincronización (SQL→Mongo) completada: ${res.data}` });
+      await cargarIncidencias();
+    } catch (error) {
+      setAlert({ type: "danger", message: "❌ Error al sincronizar desde SQL a MongoDB" });
       console.error(error);
     } finally {
       setLoading(false);
@@ -126,6 +140,7 @@ export default function Incidencias() {
         <div className="sync-controls" style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
           <button className="btn" onClick={ejecutarSincronizacionLogs}>Sincronizar Logs → SQL</button>
           <button className="btn" onClick={ejecutarSincronizacionMongoDirecto}>Sincronizar MongoDirect → SQL</button>
+          <button className="btn" onClick={ejecutarSincronizacionSqlAMongo}>Sincronizar SQL → Mongo</button>
         </div>
         <IncidenciaForm
           titulo={titulo}

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("IncidenciasTI.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9ef4d56b347468d67bbdff975c3bc991d444776b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+940f886cd4f6702172ffd5acbb555077109de901")]
 [assembly: System.Reflection.AssemblyProductAttribute("IncidenciasTI.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("IncidenciasTI.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
